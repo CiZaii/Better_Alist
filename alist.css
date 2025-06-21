@@ -4,6 +4,115 @@ TheSmallHanCat
 Koyuki
 用于文件目录美化以及背景图
 */
+/*
+ * 此代码应添加到 AList 后台的 "自定义头部 JS" 或 "自定义脚部 JS" 中。
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    let videoObserver = null;
+
+    // 监听DOM变化，因为视频播放器可能是动态加载的
+    const observerConfig = { childList: true, subtree: true };
+
+    const bodyObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList') {
+                // 检查是否有新的视频元素被添加
+                const videoElement = document.querySelector('video'); // 寻找页面中的 video 标签
+                if (videoElement && !videoObserver) {
+                    console.log('Alist: 发现视频元素，开始监听播放状态。');
+                    setupVideoListener(videoElement);
+                }
+            }
+        });
+    });
+
+    bodyObserver.observe(document.body, observerConfig);
+
+    function setupVideoListener(videoElement) {
+        // 确保只设置一次监听器
+        if (videoObserver) {
+            videoObserver.disconnect(); // 如果已经有监听器，先断开
+        }
+
+        // 存储原始透明度，以便恢复
+        const originalOpacities = new Map();
+        const targetSelectors = [
+            'body', // 如果你希望播放视频时背景图透明
+            '.hope-c-PJLV-igScBhH-css',
+            '.hope-c-PJLV-ijgzmFG-css',
+            '.hope-c-PJLV-iigjoxS-css',
+            '.hope-c-PJLV-ikEIIxw-css',
+            '.hope-c-PJLV-iiuDLME-css',
+            '.hope-c-PJLV-ikSuVsl-css',
+            '.hope-c-PJLV-idaeksS-css',
+            '.hope-c-PJLV-ifiEvmt-css',
+            // 添加其他你希望透明的 Alist UI 元素的选择器
+            // 比如 Alist 的侧边栏、顶部导航、文件列表容器等
+            // 你需要通过F12开发者工具来查找这些元素的实际类名
+            // 举例：
+            // '.chakra-modal__content', // 如果视频在模态框中
+            // '.chakra-stack[role="navigation"]', // 可能是导航栏
+            // '.hope-c-PJLV-someOtherAlistComponent-css' // 根据实际情况添加
+        ];
+
+        // 视频播放时执行
+        const handlePlay = () => {
+            console.log('Alist: 视频开始播放，设置UI透明度为0。');
+            targetSelectors.forEach(selector => {
+                document.querySelectorAll(selector).forEach(el => {
+                    if (el.style.opacity !== '0') { // 避免重复设置
+                        originalOpacities.set(el, el.style.opacity); // 存储原始透明度
+                        el.style.opacity = '0';
+                        el.style.pointerEvents = 'none'; // 禁用交互，防止点击到UI元素
+                    }
+                });
+            });
+        };
+
+        // 视频暂停或结束时执行
+        const handlePauseEnd = () => {
+            console.log('Alist: 视频暂停或结束，恢复UI透明度。');
+            targetSelectors.forEach(selector => {
+                document.querySelectorAll(selector).forEach(el => {
+                    if (originalOpacities.has(el)) {
+                        el.style.opacity = originalOpacities.get(el); // 恢复到原始透明度
+                        el.style.pointerEvents = ''; // 恢复交互
+                        originalOpacities.delete(el); // 清理
+                    }
+                });
+            });
+        };
+
+        // 监听 video 元素的播放、暂停和结束事件
+        videoElement.addEventListener('play', handlePlay);
+        videoElement.addEventListener('pause', handlePauseEnd);
+        videoElement.addEventListener('ended', handlePauseEnd);
+
+        // 使用 MutationObserver 监听 video 元素从 DOM 中移除的情况
+        // 当视频播放器关闭时，video 元素可能会被移除
+        videoObserver = new MutationObserver((mutationsList, observer) => {
+            for (let mutation of mutationsList) {
+                if (mutation.type === 'childList') {
+                    mutation.removedNodes.forEach(removedNode => {
+                        if (removedNode === videoElement || removedNode.contains(videoElement)) {
+                            console.log('Alist: 视频元素被移除，执行恢复操作。');
+                            handlePauseEnd(); // 视频元素被移除时，也恢复UI
+                            observer.disconnect(); // 断开当前视频的监听器
+                            videoObserver = null; // 清空引用，等待下一次视频元素出现
+                            return; // 退出循环
+                        }
+                    });
+                }
+            }
+        });
+
+        videoObserver.observe(videoElement.parentNode || document.body, observerConfig);
+        // 首次加载时检查视频是否已经在播放
+        if (!videoElement.paused && !videoElement.ended && videoElement.readyState > 2) {
+             handlePlay();
+        }
+    }
+});
 
 body{
 	background-image:url('https://zang-1307996497.cos.ap-beijing.myqcloud.com/undefineddark_mode.webp');//将此处替换为你自己的背景图api地址
